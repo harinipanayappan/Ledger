@@ -1,0 +1,69 @@
+services:
+  - type: web
+    name: smart-watchlist-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm run migrate && npm run seed && npm start
+    healthCheckPath: /api/health
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smart-watchlist-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: smart-watchlist-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CLIENT_ORIGIN
+        value: https://smart-watchlist-web.onrender.com
+
+  - type: worker
+    name: smart-watchlist-tick-generator
+    runtime: node
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm run tick-generator
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smart-watchlist-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: smart-watchlist-redis
+          property: connectionString
+      - key: TICK_INTERVAL_MS
+        value: 400
+      - key: SPIKE_PROBABILITY
+        value: 0.05
+
+  - type: web
+    name: smart-watchlist-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    plan: free
+    envVars:
+      - key: VITE_API_URL
+        value: https://smart-watchlist-api.onrender.com/api
+
+  - type: keyvalue
+    name: smart-watchlist-redis
+    plan: free
+    ipAllowList: []
+
+databases:
+  - name: smart-watchlist-db
+    databaseName: smart_watchlist
+    user: watchlist_user
+    plan: free
